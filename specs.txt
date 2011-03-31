@@ -1,0 +1,49 @@
+Parser:
+	generate a data structure as a graph with nieghbor list representation
+	each node has the followng:
+		
+Topo sort on dag 
+	takes unordered dag
+	produces array containing node ids in sorted order by start time
+	
+critical path calculation
+	takes unordered dag
+	produces ordered list of nodes in path, total time for path
+	
+t-level scheduler
+	take a dag
+	return a schedule
+
+b-level scheduler
+
+schedule-to-output
+	takes schedule 
+	output
+
+Data structures:
+-----------------------------------
+dag
+	ID Int, 
+	weight Int, 
+	level Int- used as t-level or b-level as needed by alg should be inited to -1 (to detect if valid)
+	child-list vector<int>
+		child-list is a list of ordered pairs of (child ID, communications cost)
+
+environment
+	num cpus
+	which algorithm to use
+	
+
+schedule
+	Vector of vectors
+	1st dim is processor
+	2nd dim is list of processes as triples (id, start, end)
+	
+	
+Output
+	makespan
+	critical path
+	sequential time
+	num cpus
+	per pcu utilization
+	
