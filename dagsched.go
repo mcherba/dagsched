@@ -16,5 +16,4 @@ func main() {
 	fmt.Printf("loading DAG from %s\n", *infname)
 	fmt.Printf("using %s scheduling algorithm\n", *algtype)
 
-	// test comment from Mike	
 } 
