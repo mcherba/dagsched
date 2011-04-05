@@ -5,3 +5,8 @@ git clone git://github.com/mcherba/dagsched.git
 git add [midified file]
 git commit
 git push git@github.com:mcherba/dagsched.git
+
+When working, be sure to periodically do a git pull to ensure you don't get 
+too far out of sync with the Repo.
+
+Commit/push early and often!
