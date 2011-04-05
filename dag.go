@@ -5,6 +5,8 @@
 package dag
 import fmt "fmt" // Package implementing formatted I/O.
 
+const maxnodes = 52 // this is set to 52 to allow for an additional entry and exit node for algorithmic simplicity 
+
 // define a struct to store a child entry in our DAG
 type ChildEntry struct {
 	id int 		// the numerical id of the child node
@@ -24,11 +26,11 @@ type DagNode struct {
 	/* an array of child pointers big enough to hold the most elements we use in 
 	 * our test program
 	 */
-	children [52]ChildEntry	  	
+	children [maxnodes]ChildEntry	  	
 }
 
 type Dag struct {
-	g [52]DagNode;
+	g [maxnodes]DagNode;
 }
 
 var thisDag Dag
@@ -44,11 +46,11 @@ func init () () {
 	var i uint = 0
 	var j uint = 0
 	
-	for i=0; i < 52; i++ {
+	for i=0; i < maxnodes; i++ {
 		thisDag.g[i].id=-1
 		thisDag.g[i].weight=-1
 		thisDag.g[i].level=-1
-		for j=0; j < 52; j++ {
+		for j=0; j < maxnodes; j++ {
 			thisDag.g[i].children[j].id=-1
 			thisDag.g[i].children[j].ccost=-1
 		}
@@ -56,6 +58,10 @@ func init () () {
 	return
 	
 }
+
+/***************************************************************************
+ * Initialize aSample DAG for use testing algrothms 
+ ***************************************************************************/
 func Itest () () {
 	
 	thisDag.g[0].id=0
@@ -93,9 +99,12 @@ func Itest () () {
 	return 
 }
 
+/***************************************************************************
+ * Print the Active DAG.  But only print elements that we've put something in. 
+ ***************************************************************************/
 func PrintDag () () {
 	var i uint = 0
-	for i =0; i < 52; i++ {
+	for i =0; i < maxnodes; i++ {
 			if thisDag.g[i].id >= 0 {
 				printNode(thisDag.g[i])
 			}
@@ -104,12 +113,16 @@ func PrintDag () () {
 	return
 }
 
+/***************************************************************************
+ * Print a single node in the DAG.  Only print Child Nodes we've used, not the 
+ * Whole array. 
+ ***************************************************************************/
 func printNode (ln DagNode) () {
 	var i uint = 0
 	
 	if ln.id != -1 {
 		fmt.Printf("%d, %d, %d [ ", ln.id, ln.weight, ln.level)
-		for i =0; i < 52; i++ {
+		for i =0; i < maxnodes; i++ {
 			if ln.children[i].id >= 0 {
 				fmt.Printf("%v ", ln.children[i])
 			}
