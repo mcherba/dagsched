@@ -1,8 +1,12 @@
+/***************************************************************************
+ * DAG Scheduler simulator, Mike and Rick UofO CIS-410 Distributed Scheduling
+ *
+ ***************************************************************************/
 package main
 
 import fmt "fmt" // Package implementing formatted I/O.
 import flag "flag" // Command line parsing
-
+import dag "./dag" // structure and code for DAGs
 func main() { 
 	
 	// Command line flags	
@@ -15,5 +19,9 @@ func main() {
 	fmt.Printf("simulating using %d cores\n", *numcores)
 	fmt.Printf("loading DAG from %s\n", *infname)
 	fmt.Printf("using %s scheduling algorithm\n", *algtype)
-
+	
+	//var thisdag dag.Dag
+	dag.Itest()
+	dag.PrintDag()
+	
 } 
