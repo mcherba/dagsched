@@ -7,6 +7,9 @@ import "strconv"
 import vector "container/vector"
 
 // returns a vector representing a dag, each element is of type Node (see "type Node struct..." below
+// calling convention:
+// v := ParseFile("path/to/fName")
+// v will then a vector as described in the comments
 func ParseFile(fName string) (vector.Vector){
 	
 	// get file contents
