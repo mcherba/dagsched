@@ -52,7 +52,7 @@ func ParseFile(fName string) (vector.Vector){
 		} else {
 			if s != "" {
 				nCount, _ = strconv.Atoi(s)
-				fmt.Printf("node count: %d\n", nCount)
+				//fmt.Printf("Node Count: %d\n", nCount)
 				s = ""
 				bIdx = i
 				break
