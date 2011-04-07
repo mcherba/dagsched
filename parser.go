@@ -6,8 +6,8 @@ import "os"
 import "strconv"
 import vector "container/vector"
 
-// method to be called by main
-func ParseFile(fName string){
+// returns a vector representing a dag, each element is of type Node (see "type Node struct..." below
+func ParseFile(fName string) (vector.Vector){
 	
 	// get file contents
 	buf, err := ioutil.ReadFile(fName)
@@ -41,7 +41,7 @@ func ParseFile(fName string){
 		}
 	}
 	
-	// get node count	
+	// get the node count	
 	for i:=bIdx; i<len(buf); i++ {
 		
 		if buf[i] != space && buf[i] != nL {
@@ -59,9 +59,7 @@ func ParseFile(fName string){
 	
 	// for each node, skip, get id int, childList vector, compCost int, skip
 	for i:=0; i<nCount; i++ {
-	
 		nT := new(nodeTemp)
-		
 		for j:=0; j<6; j++ {
 			for k:=bIdx; k<len(buf); k++ {
 				if buf[k] != space && buf[k] != nL {
@@ -87,12 +85,137 @@ func ParseFile(fName string){
 	}
 	
 	// check for correctness
+	//for i:=0; i<nCount; i++ {
+	//	(nTArray.At(i).(*nodeTemp)).printNT()
+	//}
+	
+	// vector to be returned, note that child lists are set up
+	// in the following for loops (indexed by 'i')
+	dagVec := new(vector.Vector)
+	
+	// push root
 	for i:=0; i<nCount; i++ {
-		(nTArray.At(i).(*nodeTemp)).printNT()
+		temp := (nTArray.At(i).(*nodeTemp))
+		if temp.ty == "ROOT" {
+			n    := new(Node)
+			n.id  = 0
+			n.ty  = "ROOT"
+			n.ex  = 0
+			n.lev = -1
+			for j:=0; j<(temp.cl).Len(); j++ {
+				r   := new(Rel)
+				r.id = ((temp.cl).At(j)).(int)
+				r.cc = 0
+				(n.cl).Push(r)
+			}
+			dagVec.Push(n)
+			break
+		}
 	}
 	
+	// push computation nodes
+	for i:=0; i<nTArray.Len(); i++ {
+		temp := nTArray.At(i).(*nodeTemp)
+		if temp.ty == "COMPUTATION" {
+			n    := new(Node)
+			n.id  = temp.id
+			n.ty  = temp.ty
+			n.ex  = temp.cc
+			n.lev = -1
+			for j:=0; j<(temp.cl).Len(); j++ {
+				r   := new(Rel)
+				tId := ((temp.cl).At(j)).(int)
+				for k:=0; k<nTArray.Len(); k++ {
+					tNo := nTArray.At(k).(*nodeTemp)
+					if tNo.id == tId {
+						if tNo.ty == "TRANSFER" {
+							r.id = (tNo.cl).At(0).(int)
+							r.cc = tNo.cc
+						} else if tNo.ty == "END" {
+							r.id = tNo.id
+							r.cc = 0
+						}
+					break
+					}
+				}
+				(n.cl).Push(r)
+			}
+			dagVec.Push(n)
+		}
+	}
 	
+	// push end node (no child list)
+	for i:=0; i<nTArray.Len(); i++ {
+		temp := nTArray.At(i).(*nodeTemp)
+		if temp.ty == "END" {
+			n    := new(Node)
+			n.id  = temp.id
+			n.ty  = temp.ty
+			n.ex  = 0
+			n.lev = -1
+			dagVec.Push(n)
+			break
+		}
+	}
+		
+	// set up parent lists
+	for i:=0; i<dagVec.Len(); i++ {
+		tId  := (dagVec.At(i).(*Node)).id
+		for j:=0; j<dagVec.Len(); j++ {
+			temp := dagVec.At(j).(*Node)
+			for k:=0; k<(temp.cl).Len(); k++ {
+				relT := (temp.cl).At(k).(*Rel)
+				if relT.id == tId {
+					r := new(Rel)
+					r.id = temp.id
+					r.cc = relT.cc
+					(dagVec.At(i).(*Node)).pl.Push(r)
+				}
+			}
+		}
+	}		
+	
+	// return dag vector
+	return dagVec.Copy()
 }
+
+// Node structure, the elements of the vectors cl and pl are of type Rel, see "type Rel struct..." below
+type Node struct {
+	id int
+	ty string
+	ex int
+	cl vector.Vector
+	pl vector.Vector
+	lev int
+}
+
+// Rel(ative) structure
+type Rel struct {
+	id int
+	cc int
+}
+
+// PrintNode prints a Node
+func (n *Node) PrintNode() {
+		fmt.Printf("NODE:       %d\n type:      %s\n exTime:    %d\n level:     %d\n", n.id, n.ty, n.ex, n.lev)
+		p := n.pl
+		c := n.cl
+		fmt.Printf(" parList:   ")
+		for j:=0; j<p.Len(); j++ {
+			r := p.At(j).(*Rel)
+			fmt.Printf("(%d, %d) ", r.id, r.cc)
+		}
+		fmt.Printf("\n childList: ")
+		for j:=0; j<c.Len(); j++ {
+			r := c.At(j).(*Rel)
+			fmt.Printf("(%d, %d) ", r.id, r.cc)
+		}
+		fmt.Printf("\n")
+}
+
+// *****
+// Helper functions
+// *****
 
 // made to get some practice writing func's
 func checkNC(s string) bool {
@@ -138,6 +261,7 @@ func (n *nodeTemp) printNT() {
 	}
 	fmt.Printf("\n")
 }
+
 
 	
 	
