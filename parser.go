@@ -98,15 +98,15 @@ func ParseFile(fName string) (vector.Vector){
 		temp := (nTArray.At(i).(*nodeTemp))
 		if temp.ty == "ROOT" {
 			n    := new(Node)
-			n.id  = 0
-			n.ty  = "ROOT"
-			n.ex  = 0
-			n.lev = -1
+			n.Id  = 0
+			n.Ty  = "ROOT"
+			n.Ex  = 0
+			n.Lev = -1
 			for j:=0; j<(temp.cl).Len(); j++ {
 				r   := new(Rel)
-				r.id = ((temp.cl).At(j)).(int)
-				r.cc = 0
-				(n.cl).Push(r)
+				r.Id = ((temp.cl).At(j)).(int)
+				r.Cc = 0
+				(n.Cl).Push(r)
 			}
 			dagVec.Push(n)
 			break
@@ -118,10 +118,10 @@ func ParseFile(fName string) (vector.Vector){
 		temp := nTArray.At(i).(*nodeTemp)
 		if temp.ty == "COMPUTATION" {
 			n    := new(Node)
-			n.id  = temp.id
-			n.ty  = temp.ty
-			n.ex  = temp.cc
-			n.lev = -1
+			n.Id  = temp.id
+			n.Ty  = temp.ty
+			n.Ex  = temp.cc
+			n.Lev = -1
 			for j:=0; j<(temp.cl).Len(); j++ {
 				r   := new(Rel)
 				tId := ((temp.cl).At(j)).(int)
@@ -129,16 +129,16 @@ func ParseFile(fName string) (vector.Vector){
 					tNo := nTArray.At(k).(*nodeTemp)
 					if tNo.id == tId {
 						if tNo.ty == "TRANSFER" {
-							r.id = (tNo.cl).At(0).(int)
-							r.cc = tNo.cc
+							r.Id = (tNo.cl).At(0).(int)
+							r.Cc = tNo.cc
 						} else if tNo.ty == "END" {
-							r.id = tNo.id
-							r.cc = 0
+							r.Id = tNo.id
+							r.Cc = 0
 						}
 					break
 					}
 				}
-				(n.cl).Push(r)
+				(n.Cl).Push(r)
 			}
 			dagVec.Push(n)
 		}
@@ -149,10 +149,10 @@ func ParseFile(fName string) (vector.Vector){
 		temp := nTArray.At(i).(*nodeTemp)
 		if temp.ty == "END" {
 			n    := new(Node)
-			n.id  = temp.id
-			n.ty  = temp.ty
-			n.ex  = 0
-			n.lev = -1
+			n.Id  = temp.id
+			n.Ty  = temp.ty
+			n.Ex  = 0
+			n.Lev = -1
 			dagVec.Push(n)
 			break
 		}
@@ -160,16 +160,16 @@ func ParseFile(fName string) (vector.Vector){
 		
 	// set up parent lists
 	for i:=0; i<dagVec.Len(); i++ {
-		tId  := (dagVec.At(i).(*Node)).id
+		tId  := (dagVec.At(i).(*Node)).Id
 		for j:=0; j<dagVec.Len(); j++ {
 			temp := dagVec.At(j).(*Node)
-			for k:=0; k<(temp.cl).Len(); k++ {
-				relT := (temp.cl).At(k).(*Rel)
-				if relT.id == tId {
+			for k:=0; k<(temp.Cl).Len(); k++ {
+				relT := (temp.Cl).At(k).(*Rel)
+				if relT.Id == tId {
 					r := new(Rel)
-					r.id = temp.id
-					r.cc = relT.cc
-					(dagVec.At(i).(*Node)).pl.Push(r)
+					r.Id = temp.Id
+					r.Cc = relT.Cc
+					(dagVec.At(i).(*Node)).Pl.Push(r)
 				}
 			}
 		}
@@ -181,38 +181,51 @@ func ParseFile(fName string) (vector.Vector){
 
 // Node structure, the elements of the vectors cl and pl are of type Rel, see "type Rel struct..." below
 type Node struct {
-	id int
-	ty string
-	ex int
-	cl vector.Vector
-	pl vector.Vector
-	lev int
+	Id int
+	Ty string
+	Ex int
+	Cl vector.Vector
+	Pl vector.Vector
+	Lev int
 }
 
 // Rel(ative) structure
 type Rel struct {
-	id int
-	cc int
+	Id int
+	Cc int
+}
+
+// Copy returns a copy of a node
+func (n *Node) Copy() (*Node) {
+	t    := new(Node)
+	t.Id  = n.Id
+	t.Ty  = n.Ty
+	t.Ex  = n.Ex
+	t.Cl  = (n.Cl).Copy()
+	t.Pl  = (n.Pl).Copy()
+	t.Lev = n.Lev
+	return t
 }
 
 // PrintNode prints a Node
 func (n *Node) PrintNode() {
-	fmt.Printf("NODE:       %d\n type:      %s\n exTime:    %d\n level:     %d\n", n.id, n.ty, n.ex, n.lev)
-	p := n.pl
-	c := n.cl
+	fmt.Printf("NODE:       %d\n type:      %s\n exTime:    %d\n level:     %d\n", n.Id, n.Ty, n.Ex, n.Lev)
+	p := n.Pl
+	c := n.Cl
 	fmt.Printf(" parList:   ")
 	for j:=0; j<p.Len(); j++ {
 		r := p.At(j).(*Rel)
-		fmt.Printf("(%d, %d) ", r.id, r.cc)
+		fmt.Printf("(%d, %d) ", r.Id, r.Cc)
 	}
 	fmt.Printf("\n childList: ")
 	for j:=0; j<c.Len(); j++ {
 		r := c.At(j).(*Rel)
-		fmt.Printf("(%d, %d) ", r.id, r.cc)
+		fmt.Printf("(%d, %d) ", r.Id, r.Cc)
 	}
 	fmt.Printf("\n")
 }
 
+// PrintDAG prints a dag represented by v
 func PrintDAG(v vector.Vector) {
 	for i:=0; i<v.Len(); i++ {
 		(v.At(i).(*Node)).PrintNode()
