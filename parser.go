@@ -283,7 +283,15 @@ func (n *nodeTemp) printNT() {
 
 
 	
-	
+// get the index of a node in a vector given nodes ID
+func GetIndexById (v vector.Vector,  id int) (int) {
+	for i:=0; i<v.Len(); i++ {
+		if v.At(i).(*Node).Id == id {
+			return i
+		}
+	}
+	return -1
+}
 	
 	
 	
