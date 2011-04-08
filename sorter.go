@@ -8,10 +8,14 @@ import par "./parser"
 func TopSort(dag vec.Vector, s byte) (vec.Vector) {
 
 	sortDag := new(vec.Vector)
-	tempDag := dag.Copy()
-	destDag := tempDag.Copy()
+	tempDag := new(vec.Vector)
+	destDag := new(vec.Vector)
 	setVec  := new(vec.Vector)
 	
+	for i:=0; i<dag.Len(); i++ {
+		tempDag.Push((dag.At(i).(*par.Node)).Copy())
+		destDag.Push((dag.At(i).(*par.Node)).Copy())
+	}
 	// t-level gets regular top sort
 	if s == 't' {
 		setVec.Push(tempDag.At(0))
