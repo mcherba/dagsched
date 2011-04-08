@@ -7,9 +7,6 @@ import "strconv"
 import vector "container/vector"
 
 // returns a vector representing a dag, each element is of type Node (see "type Node struct..." below
-// calling convention:
-// v := ParseFile("path/to/fName")
-// v will then a vector as described in the comments
 func ParseFile(fName string) (vector.Vector){
 	
 	// get file contents
@@ -52,7 +49,7 @@ func ParseFile(fName string) (vector.Vector){
 		} else {
 			if s != "" {
 				nCount, _ = strconv.Atoi(s)
-				//fmt.Printf("Node Count: %d\n", nCount)
+				//fmt.Printf("node count: %d\n", nCount)
 				s = ""
 				bIdx = i
 				break
@@ -200,20 +197,26 @@ type Rel struct {
 
 // PrintNode prints a Node
 func (n *Node) PrintNode() {
-		fmt.Printf("NODE:       %d\n type:      %s\n exTime:    %d\n level:     %d\n", n.id, n.ty, n.ex, n.lev)
-		p := n.pl
-		c := n.cl
-		fmt.Printf(" parList:   ")
-		for j:=0; j<p.Len(); j++ {
-			r := p.At(j).(*Rel)
-			fmt.Printf("(%d, %d) ", r.id, r.cc)
-		}
-		fmt.Printf("\n childList: ")
-		for j:=0; j<c.Len(); j++ {
-			r := c.At(j).(*Rel)
-			fmt.Printf("(%d, %d) ", r.id, r.cc)
-		}
-		fmt.Printf("\n")
+	fmt.Printf("NODE:       %d\n type:      %s\n exTime:    %d\n level:     %d\n", n.id, n.ty, n.ex, n.lev)
+	p := n.pl
+	c := n.cl
+	fmt.Printf(" parList:   ")
+	for j:=0; j<p.Len(); j++ {
+		r := p.At(j).(*Rel)
+		fmt.Printf("(%d, %d) ", r.id, r.cc)
+	}
+	fmt.Printf("\n childList: ")
+	for j:=0; j<c.Len(); j++ {
+		r := c.At(j).(*Rel)
+		fmt.Printf("(%d, %d) ", r.id, r.cc)
+	}
+	fmt.Printf("\n")
+}
+
+func PrintDAG(v vector.Vector) {
+	for i:=0; i<v.Len(); i++ {
+		(v.At(i).(*Node)).PrintNode()
+	}
 }
 
 // *****
