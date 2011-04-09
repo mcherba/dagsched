@@ -33,12 +33,23 @@ func main() {
 	//parser.PrintDAG(tsdag)
 	//fmt.Printf("%v", tsdag.At(0).Id)
 	tlevel(dag)
+	fmt.Printf("-------------------\n\n")
+	tlevelsched(dag, 2)
+	
+	slist:=sorter.TSort(dag)
+	fmt.Printf("\n\n%v\n\n, last=%d", slist, slist.Last())
 	
 } 
 
+type Event struct {
+	id int
+	start int64
+	end int64
+}
+
 func tlevel (indag vec.Vector) () {
 	var TopList = sorter.TopSort(indag, 't')
-	var max int
+	var max int64
 	parser.PrintDAG(TopList)
 	//initialize the level of the root node to 0
 	(TopList.At(0).(*parser.Node)).Lev = 0
@@ -64,4 +75,55 @@ func tlevel (indag vec.Vector) () {
 		(TopList.At(i).(*parser.Node)).Lev = max
 		fmt.Printf("(%d)\n", max) 
 	}
+}
+
+// schedule using t-level Earliest Start time 1st 
+func tlevelsched (indag vec.Vector, ncpus int) () {
+	//cpu:= new(vec.Vector)  // holds the cpu assigned to a task
+	cpu:=make([]int, len(indag))
+	
+	var TopList = 	sorter.TopSort(indag, 't')
+	var max int64
+	var ncpu int
+	var pCost int64
+
+	
+	//initialize the level of the root node to 0
+	(TopList.At(0).(*parser.Node)).Lev = 0
+	//always schedule the root node on cpu 0
+	cpu[0]=0
+	// for each node in the sorted list
+	for i:=1; i<len(TopList); i++ {
+		max=0
+		ncpu=0
+		// for each parent node of the present node
+		for j:=0; j<len((TopList.At(i).(*parser.Node)).Pl); j++ {
+			
+
+			linkW:= (TopList.At(i).(*parser.Node)).Pl.At(j).(*parser.Rel).Cc
+			
+			pId:= (TopList.At(i).(*parser.Node)).Pl.At(j).(*parser.Rel).Id
+			pIndex:=parser.GetIndexById(TopList, pId)
+			pLevel:=(TopList.At(pIndex).(*parser.Node)).Lev
+			
+			for k:=0; k < ncpus; k++ {
+				if k != cpu[pIndex] {	
+					pCost=(TopList.At(pIndex).(*parser.Node)).Ex
+				} else {
+					pCost=0
+				}
+				if  ( pLevel + linkW +  pCost) > max {
+					max = pLevel + linkW +  pCost
+					ncpu = k
+				}
+			}
+			
+		}
+		(TopList.At(i).(*parser.Node)).Lev = max
+		cpu[i]=(ncpu)
+		
+		nodeID:=(TopList.At(i).(*parser.Node)).Id
+		fmt.Printf("Scheduling %d on cpu%d with t-level %d\n", nodeID, ncpu, max) 
+	}
+	
 }
