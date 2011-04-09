@@ -71,7 +71,7 @@ func ParseFile(fName string) (vector.Vector){
 							case 1: nT.id, _ = strconv.Atoi(s)
 							case 2: nT.cl    = getCVec(s)
 							case 3: nT.ty    = s
-							case 4: nT.cc, _ = strconv.Atoi(s)
+							case 4: nT.cc, _ = strconv.Atoi64(s)
 							case 5: // PAR COST - unused
 						}
 						s = ""
@@ -183,16 +183,16 @@ func ParseFile(fName string) (vector.Vector){
 type Node struct {
 	Id int
 	Ty string
-	Ex int
+	Ex int64
 	Cl vector.Vector
 	Pl vector.Vector
-	Lev int
+	Lev int64
 }
 
 // Rel(ative) structure
 type Rel struct {
 	Id int
-	Cc int
+	Cc int64
 }
 
 // Copy returns a copy of a node
@@ -269,7 +269,7 @@ type nodeTemp struct {
 	id int
 	cl vector.Vector
 	ty string
-	cc int
+	cc int64
 }
 
 // another practice func, but checks correctness
