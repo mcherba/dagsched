@@ -293,11 +293,9 @@ func GetIndexById (v vector.Vector,  id int) (int) {
 	return -1
 }
 
-// reset levels of all nodes to -1
-func ResetLevel (v vector.Vector) {
-	for i:=0; i<v.Len(); i++ {
-		v.At(i).(*Node).Lev = -1
-	}
+// reset levels of a node to -1
+func (n *Node) ResetLevel () {
+	n.Lev = -1
 }
 	
 	
