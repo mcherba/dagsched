@@ -10,7 +10,8 @@ do
 	for nt in {1..25}
 	do
 		fname=$(printf "%.3d.dag" "$nt")
-		daggen -n $nn --mindata 10 --maxdata 1500 --fat .73  --density .37 regular .2 --ccr 3 --jump 3 --maxalpha 0 > $fname
+		#daggen -n $nn --mindata 10 --maxdata 1500 --fat .73  --density .37 regular .2 --ccr 3 --jump 3 --maxalpha 0 > $fname
+		daggen -n $nn --fat .73  --density .37 regular .2 --ccr 3 --jump 3  > $fname
 	done
 	popd
 done
