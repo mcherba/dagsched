@@ -7,14 +7,18 @@ package main
 import fmt "fmt" // Package implementing formatted I/O.
 import flag "flag" // Command line parsing
 import parser "./parser" // structure and code for DAGs
-import sorter "./sorter" // topological sort
+//import sorter "./sorter" // topological sort
 import vec "container/vector"
+import gt "./getTimes" // get time info from dags
 func main() { 
 	
 	// Command line flags	
-	var numcores *int = flag.Int("n", 2, "number of cores to use in the simulation [-n Int value]")
-	var infname *string = flag.String("f", "infile.dag", "filename to load the .dag from [-f filename.dag]")
-	var algtype *string = flag.String("a", "t-level", "algorithm type to use t-level, b-level, or ??")
+	var numcores *int = flag.Int("n", 2, 
+		"number of cores to use in the simulation [-n Int value]")
+	var infname *string = flag.String("f", "infile.dag", 
+		"filename to load the .dag from [-f filename.dag]")
+	var algtype *string = flag.String("a", "t-level", 
+		"algorithm type to use t-level, b-level, or ??")
 	
 
 	flag.Parse()
@@ -26,19 +30,15 @@ func main() {
 	
 	// Read in the dag we want to schedule
 	var dag = parser.ParseFile(*infname)
-	//parser.PrintDAG(dag)
 	
-	// topo sort it
-	//var tsdag = sorter.TopSort(dag, 't')
-	//parser.PrintDAG(tsdag)
-	//fmt.Printf("%v", tsdag.At(0).Id)
-	tlevel(dag)
-	fmt.Printf("-------------------\n\n")
-	tlevelsched(dag, 2)
+	// Schedule using t-level
+	ScheduleTlevel(dag, *numcores)
 	
-	slist:=sorter.TSort(dag)
-	fmt.Printf("\n\n%v\n\n, last=%d", slist, slist.Last())
 	
+	fmt.Printf("SeqTime %v\n", gt.SeqTime(dag))
+	parser.PrintDAG(dag)
+	fmt.Printf("CPTime %v\n", gt.CPTime(dag))
+	parser.PrintDAG(dag)
 } 
 
 type Event struct {
@@ -47,83 +47,229 @@ type Event struct {
 	end int64
 }
 
-func tlevel (indag vec.Vector) () {
-	var TopList = sorter.TopSort(indag, 't')
-	var max int64
-	parser.PrintDAG(TopList)
-	//initialize the level of the root node to 0
-	(TopList.At(0).(*parser.Node)).Lev = 0
+
+// schedule using t-level Earliest Start time 1st 
+func ScheduleTlevel(dag vec.Vector, ncpus int) (){
+	var el int64
+	var nt int
+	var iccost bool
+	cpu:=make([]int, len(dag)) // cpu is a slice as long as the dag
+	for i:=0; i < len(dag); i++ {
+		cpu[i]= -1
+	}
+	// Create a schedule as a vector of Event Vectors
+	Schedule:= make([]vec.Vector, ncpus)
+	// produce a topographically sorted DAG to work with
+  //var dag =	&sorter.TopSort(*indag, 't')
+  // we don't actually have to do a topo sort because all we use that for is
+  // to get the first schedulable node, but we have that because we always have 
+  // a root node of time 0, so we just start our t-levels from there.
 	
-	// for each node in the sorted list
-	for i:=1; i<len(TopList); i++ {
-		max=0
-		// for each parent node of the present node
-		for j:=0; j<len((TopList.At(i).(*parser.Node)).Pl); j++ {
-			nodeID:=(TopList.At(i).(*parser.Node)).Id
-			pId:= (TopList.At(i).(*parser.Node)).Pl.At(j).(*parser.Rel).Id
-			linkW:= (TopList.At(i).(*parser.Node)).Pl.At(j).(*parser.Rel).Cc
-			pIndex:=parser.GetIndexById(TopList, pId)
-			pLevel:=(TopList.At(pIndex).(*parser.Node)).Lev
-			pCost:=(TopList.At(pIndex).(*parser.Node)).Ex
-			fmt.Printf("(nodeId %d: i %d, j %d, pId %d, pLevel %d, parent index:%d)\t", nodeID, i, j,pId, pLevel, pIndex)
-			fmt.Printf(" Link to parent cost: %d ", pCost)
-			fmt.Printf(" linkw %d, pCost %d,  cp %d \n", linkW, pCost, pLevel + linkW +  pCost)
-			if  ( pLevel + linkW +  pCost) > max {
-				max = pLevel + linkW +  pCost
+	//update the t-level of the root node
+ 	dag.At(0).(*parser.Node).Lev=0
+ 	//recursively update the t-levels of it's children
+ 	tlUpdateChildren(dag,0)
+ 	
+ 	
+	startTime := make([]int64, ncpus) // holds current start times	
+	
+
+	for i:=0; i <ncpus; i++ { // initialize all start times to 0
+		startTime[i]=0
+	}
+	
+	//cEvent.id=0
+	//cEvent.start=0
+	//cEvent.end=0
+	
+	// always schedule the start task onto cpu 0
+	//Schedule[0].Push(cEvent)
+	//cpu[0]=0
+
+
+	for i:=0; i < len(dag); i++ {
+		var coreChosen = -1
+		var earliestAvail int64
+		var earliestFeasable int64
+		var efc int
+
+		el=9223372036854775807 // largest signed integer
+		earliestAvail=9223372036854775807
+		earliestFeasable=9223372036854775807
+
+		nt=0
+		
+		// Select the next task to Schedule
+		// look through the dag for the task with the lowest t-level
+		for j:=0; j < len(dag); j++ {
+			if (cpu[j] < 0) && (dag.At(j).(*parser.Node).Lev < el) {
+				nt=j
+				el=dag.At(j).(*parser.Node).Lev
 			}
 		}
-		(TopList.At(i).(*parser.Node)).Lev = max
-		fmt.Printf("(%d)\n", max) 
+		
+		// select a cpu to schedule it on
+	  for c:=ncpus-1; c >= 0; c-- {
+	  	if startTime[c] <= el {
+	  		coreChosen = c
+	  	}	
+	  }
+	  if coreChosen == -1 {
+	  	for c:=ncpus-1; c >= 0; c-- {
+	  		if startTime[c] <= earliestAvail {
+	  			earliestAvail = startTime[c]
+	  			
+	  			coreChosen = c
+	  		}	
+	  	}
+	  }
+
+	  
+
+	  esT := make([]int64, ncpus)
+	  pet :=new(vec.Vector)
+	  pCpu :=new(vec.Vector)
+	  iccost=false
+	  
+	  //see if we have to account for communications time
+    //check each parent to see what cpu it was scheduled on
+	  //eA=0
+	  for j:=0; j < len(dag.At(nt).(*parser.Node).Pl); j++ {
+	  	cParentId:=dag.At(nt).(*parser.Node).Pl.At(j).(*parser.Rel).Id
+	  	comC := dag.At(nt).(*parser.Node).Pl.At(j).(*parser.Rel).Cc
+	  	cParent:=parser.GetIndexById(dag, cParentId)
+	  	cpCore :=  cpu[cParent]
+	  	cpIndex := findInSchedule(Schedule[cpCore], cParentId)
+	  	
+	  	pet.Push(Schedule[cpCore].At(cpIndex).(*Event).end + comC)
+	  	pCpu.Push(cpCore)
+	  	
+	  	if cpu[cParent]!= coreChosen {
+	  			iccost=true
+	  	}
+
+	  }
+
+	  //find the core where the parentend+comm cost is least
+	  efc=0
+	  for c:=0; c < ncpus; c++ {
+	  	esT[c]=startTime[c]
+	  	 
+	  	for p:=0; p < pCpu.Len(); p++ {
+	  		if pCpu.At(p) != c {
+	  			if pet.At(p).(int64) > esT[c] {
+	  				esT[c] = pet.At(p).(int64)
+	  			}
+	  		}
+	  	}
+	  	if esT[c] < earliestFeasable {
+	  		earliestFeasable = esT[c]
+	  		efc=c
+	  	}
+	  }
+	   
+		el=startTime[coreChosen]
+		// if we have to account for comm overhead chose this core
+		if iccost {
+	    el = earliestFeasable
+			coreChosen = efc
+	  }
+	  
+		// prepare the event
+		ccEvent:=new(Event)
+		ccEvent.id=dag.At(nt).(*parser.Node).Id
+		ccEvent.start=el
+		ccEvent.end=el+dag.At(nt).(*parser.Node).Ex
+
+	  // update the available startTime for the core we chose
+	  startTime[coreChosen] = ccEvent.end 
+
+	  // schedule the task on a core
+	  Schedule[coreChosen].Push(ccEvent)
+	  cpu[nt]=coreChosen
+	  
+	  
+	  if dag.At(nt).(*parser.Node).Lev!=el {
+	  	//update the t-level of the current node
+	  	dag.At(nt).(*parser.Node).Lev=el
+	  	//update the t-levels of any children
+	  	tlUpdateChildren(dag,nt)
+	  }
+	  
+	  
+	}
+
+	PrintSchedule(Schedule)		
+}
+
+// Given the id of a task that has been scheduled on a processor
+// return the index of that Task's Event entry
+func findInSchedule(v vec.Vector, id int) (int){
+	for i:=0; i<len(v); i++ {
+		if v.At(i).(*Event).id == id {
+				return i
+		}
+		
+	}
+	return -1
+}
+
+// Print out a schedule
+// needed to verify that we're getting real schedules out of this
+func PrintSchedule(Schedule []vec.Vector) () {
+	for i:=0; i< len(Schedule); i++ {
+		fmt.Printf("Schedule for core%d: %d tasks\n", i,len(Schedule[i]) )
+		for j:=0; j < len(Schedule[i]); j++ {
+			fmt.Printf("task %d, from %d to %d\n", Schedule[i].At(j).(*Event).id, 
+				Schedule[i].At(j).(*Event).start, Schedule[i].At(j).(*Event).end)
+		}
+	}
+	
+}
+
+// given a dag and a node within that dag update the t-levels of all children 
+// of that node
+func tlUpdateChildren(dag vec.Vector, nt int) {
+	visited:=make([]bool, len(dag))
+	for ii:=0; ii < len(dag); ii++ {
+		visited[ii]=false
+	}
+		//recurse
+	for jj:=0; jj<len((dag.At(nt).(*parser.Node)).Cl); jj++ {
+		if !(visited[parser.GetIndexById(dag, 
+			(dag.At(nt).(*parser.Node)).Cl.At(jj).(*parser.Rel).Id)]) {
+				tlUpdate(dag, visited, parser.GetIndexById(dag, 
+					(dag.At(nt).(*parser.Node)).Cl.At(jj).(*parser.Rel).Id))
+		}
 	}
 }
 
-// schedule using t-level Earliest Start time 1st 
-func tlevelsched (indag vec.Vector, ncpus int) () {
-	//cpu:= new(vec.Vector)  // holds the cpu assigned to a task
-	cpu:=make([]int, len(indag))
-	
-	var TopList = 	sorter.TopSort(indag, 't')
+// The recursive helper function for tlUpdateChildren
+func tlUpdate(dag vec.Vector, visited []bool, nt int) {
 	var max int64
-	var ncpu int
 	var pCost int64
-
-	
-	//initialize the level of the root node to 0
-	(TopList.At(0).(*parser.Node)).Lev = 0
-	//always schedule the root node on cpu 0
-	cpu[0]=0
-	// for each node in the sorted list
-	for i:=1; i<len(TopList); i++ {
-		max=0
-		ncpu=0
-		// for each parent node of the present node
-		for j:=0; j<len((TopList.At(i).(*parser.Node)).Pl); j++ {
-			
-
-			linkW:= (TopList.At(i).(*parser.Node)).Pl.At(j).(*parser.Rel).Cc
-			
-			pId:= (TopList.At(i).(*parser.Node)).Pl.At(j).(*parser.Rel).Id
-			pIndex:=parser.GetIndexById(TopList, pId)
-			pLevel:=(TopList.At(pIndex).(*parser.Node)).Lev
-			
-			for k:=0; k < ncpus; k++ {
-				if k != cpu[pIndex] {	
-					pCost=(TopList.At(pIndex).(*parser.Node)).Ex
-				} else {
-					pCost=0
-				}
-				if  ( pLevel + linkW +  pCost) > max {
-					max = pLevel + linkW +  pCost
-					ncpu = k
-				}
-			}
-			
-		}
-		(TopList.At(i).(*parser.Node)).Lev = max
-		cpu[i]=(ncpu)
-		
-		nodeID:=(TopList.At(i).(*parser.Node)).Id
-		fmt.Printf("Scheduling %d on cpu%d with t-level %d\n", nodeID, ncpu, max) 
+	max=0
+	if visited[nt] {
+		return
 	}
-	
+	for j:=0; j < len((dag.At(nt).(*parser.Node)).Pl); j++ {
+		pIndex:=parser.GetIndexById(dag, 
+			(dag.At(nt).(*parser.Node)).Pl.At(j).(*parser.Rel).Id)
+		pLevel:=(dag.At(pIndex).(*parser.Node)).Lev
+		linkW:= (dag.At(nt).(*parser.Node)).Pl.At(j).(*parser.Rel).Cc
+		pCost=(dag.At(pIndex).(*parser.Node)).Ex
+		
+		if  ( pLevel + linkW +  pCost) > max {
+			max = pLevel + linkW +  pCost 
+		}
+	}
+		//actually set the level
+		dag.At(nt).(*parser.Node).Lev = max	
+		
+	visited[nt]=true
+	//recurse
+	for jj:=0; jj<len((dag.At(nt).(*parser.Node)).Cl); jj++ {
+		tlUpdate(dag, visited, parser.GetIndexById(dag, 
+			(dag.At(nt).(*parser.Node)).Cl.At(jj).(*parser.Rel).Id))
+	}
 }
