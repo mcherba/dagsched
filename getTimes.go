@@ -18,6 +18,7 @@ func SeqTime (v vec.Vector) (int64) {
 // takes vector of nodes, returns critical path length
 func CPTime (v vec.Vector) (int64) {
 	var sLoc int
+	var cpt int64
 	sLoc = -1
 	for i:=0; i<v.Len(); i++ {
 		v.At(i).(*p.Node).ResetLevel()
@@ -27,8 +28,11 @@ func CPTime (v vec.Vector) (int64) {
 	}
 	
 	setCPTime(&v, sLoc)
-	
-	return v.At(sLoc).(*p.Node).Lev
+	cpt = v.At(sLoc).(*p.Node).Lev
+	for i:=0; i<v.Len(); i++ {
+		v.At(i).(*p.Node).ResetLevel()
+	}
+	return cpt
 }
 
 // helper for func CPTime	
