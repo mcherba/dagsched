@@ -38,6 +38,9 @@ func main() {
 	case "bl":
 		// schedule using b-level
 		ScheduleBlevel(dag, *numcores)
+		
+	case "c":
+		ScheduleC(dag, *numcores)
 
 	}
 	
@@ -256,16 +259,7 @@ func ScheduleBlevel(indag vec.Vector, ncpus int) (){
 				el=dag.At(j).(*parser.Node).Lev
 			}
 		}
-		
 
-		// select a cpu to schedule it on
-		/*
-	  for c:=ncpus-1; c >= 0; c-- {
-	  	if startTime[c] <= el {
-	  		coreChosen = c
-	  	}	
-	  }
-	  */
 	  // if none is obvious then we'll record some info and default to 0
 	  //if coreChosen == -1 {
 	  	for c:=ncpus-1; c >= 0; c-- {
@@ -276,12 +270,8 @@ func ScheduleBlevel(indag vec.Vector, ncpus int) (){
 	  	}
 	  //}
 	  
-	  //fmt.Printf("Task %d, Core chosen=%d\n",dag.At(nt).(*parser.Node).Id, coreChosen)
-	  
-	  //fmt.Printf("A\n")
 	  //see if we have to account for communications time
     //check each parent to see what cpu it was scheduled on
-	  //eA=0
 	  if coreChosen == -1 {
 	  	coreChosen=0
 	  }
@@ -293,14 +283,6 @@ func ScheduleBlevel(indag vec.Vector, ncpus int) (){
 	  	comC := dag.At(nt).(*parser.Node).Pl.At(j).(*parser.Rel).Cc
 	  	cParent:=parser.GetIndexById(dag, cParentId)
 	  	cpCore :=  cpu[cParent]
-	  	/*
-	  	fmt.Printf("Iteration %d ncpus=%v  cpCore=%v\n", j, ncpus, cpCore)
-	  	if cpCore== -1 {
-	  			PrintSchedule(Schedule)
-	  	}
-	  	fmt.Printf("cParent=%d, cParentId=%d\n", cParent, cParentId)
-	  	fmt.Printf("Schedule[cpCore]=%v  cParentd=%v\n", Schedule[cpCore], cParentId)
-	  	*/
 	  	cpIndex := findInSchedule(Schedule[cpCore], cParentId)
 	  	
 	  	// Here's what we want
@@ -314,34 +296,7 @@ func ScheduleBlevel(indag vec.Vector, ncpus int) (){
 
 	  }
 	  
- 	  //see if we have to account for communications time
-    //check each parent to see what cpu it was scheduled on
-	  //eA=0
-	  /*
-	  for j:=0; j < len(dag.At(nt).(*parser.Node).Cl); j++ {
-	  	fmt.Printf("Task %d has child nodes=%d\n", dag.At(nt).(*parser.Node).Id, len(dag.At(nt).(*parser.Node).Cl))
-	  	// set up scratch variables, otherwise the statement to capture 
-	  	// what we want is too long and complex.
-	  	cParentId:=dag.At(nt).(*parser.Node).Cl.At(j).(*parser.Rel).Id
-	  	comC := dag.At(nt).(*parser.Node).Cl.At(j).(*parser.Rel).Cc
-	  	cParent:=parser.GetIndexById(dag, cParentId)
-	  	cpCore :=  cpu[cParent]
-	  	fmt.Printf("ncpus=%v  cpCore=%v\n", ncpus, cpCore)
-	  	fmt.Printf("Schedule[cpCore]=%v  cChildId=%v\n", Schedule[cpCore], cParentId)
-	  	cpIndex := findInSchedule(Schedule[cpCore], cParentId)
-	  	
-	  	// Here's what we want
-	  	pet.Push(Schedule[cpCore].At(cpIndex).(*Event).end + comC)
-	  	pCpu.Push(cpCore)
-	  	
-	  	// check and see if we need to account for comm costs.
-	  	if cpu[cParent]!= coreChosen {
-	  			iccost=true
-	  	}
 
-	  }
-*/
-	  //fmt.Printf("B\n")
 	  //find the core where the parentend+comm cost is least
 	  efc=0
 	  for c:=0; c < ncpus; c++ {
@@ -391,12 +346,6 @@ func ScheduleBlevel(indag vec.Vector, ncpus int) (){
 	fmt.Printf("%d,", makespan)
 	fmt.Printf("%d,", gt.CPTime(dag))
 	fmt.Printf("%v\n", float64(SumExTime(Schedule)) / float64(makespan*int64(ncpus)))
-	//fmt.Printf("%v\n",  SumExTime(Schedule))
-	//fmt.Printf("\n")
-	
-	//parser.PrintDAG(dag)
-	
-	//parser.PrintDAG(dag)
 }
 
 
@@ -420,6 +369,7 @@ func SumExTime (S []vec.Vector) (int64){
 			for j:=0; j < S[i].Len(); j++ {
 				tsum += S[i].At(j).(*Event).end - S[i].At(j).(*Event).start
 			}
+			// other variant
 			/*if S[i].Len() > 0 {
 			  tsum += S[i].Last().(*Event).end - S[i].At(0).(*Event).start
 			}*/
@@ -559,4 +509,127 @@ func blUpdate(dag vec.Vector, visited []bool, nt int) {
 	}
 }
 
+// chain following scheduler
+// this will attempt to follow a chain from parent to child on one core, 
+// then move to the next available core and continue
+// it assumes all communication costs are NULL and only depends on parent 
+// completion
+func ScheduleC(dag vec.Vector, ncpus int) (){
+	startTime := make([]int64, ncpus) // holds current start times	
+  // initialize all start times to 0
+	for i:=0; i <ncpus; i++ { 
+		startTime[i]=0
+	}
+
+	// create a slice to hold the number of parents that must complete before we 
+	// can schedule the task 
+	pReq:=make([]int, len(dag))
+	for i:=0; i < len(dag); i++ {
+		pReq[i] = dag.At(i).(*parser.Node).Pl.Len()		
+	}
+	//parser.PrintDAG(dag)
+	
+	st:=make([]int64, len(dag))
+	for i:=0; i < len(dag); i++ {
+		st[i] = 0
+	}
+	
+	// Create a schedule as a vector of Event Vectors
+	Schedule:= make([]vec.Vector, ncpus)
+	
+	cpu:=make([]int, len(dag)) // cpu is a slice as long as the dag
+	for i:=0; i < len(dag); i++ {
+		cpu[i]= -1
+	}
+	
+	for i:=0; i < len(dag); i++ {
+		if (pReq[i] == 0) && (cpu[i] < 0)  {
+			ScheduleCrec(dag, ncpus, i, startTime, 0, pReq, Schedule, cpu, st)
+		}
+		//fmt.Printf("Starting Again\n")
+	}
+	//PrintSchedule(Schedule)
+	makespan:=findScheduleEnd(Schedule)
+	fmt.Printf("%d,", (len(dag)-2))  // don't count the 0 time start and end tasks
+	fmt.Printf("%d,", gt.SeqTime(dag))
+	fmt.Printf("%d,", makespan)
+	fmt.Printf("%d,", gt.CPTime(dag))
+	fmt.Printf("%v\n", float64(SumExTime(Schedule)) / float64(makespan*int64(ncpus)))
+}
+
+func ScheduleCrec(dag vec.Vector, ncpus int, current int, startTime []int64, lsTime int64, pReq []int, Schedule []vec.Vector, cpu []int, st []int64) {
+//fmt.Printf("Task %d, can start at %d, parents required %v\n", dag.At(current).(*parser.Node).Id, lsTime, pReq)
+	//var el int64
+	//var nt int
+	//var iccost bool
+	// produce a topographically sorted DAG to work with
+	// it's better to start at the beginning
+	//var dag =	sorter.TopSort(indag, 't')
+	var cChosen = -1
+	var eAvail int64
+	eAvail = 9223372036854775807
+	var eAvailC = 0
+	
+
+
+	
+
+	
+	//find the first available node where all parents are ready
+
+	//Schedule task
+	// find the first available core
+	for j:=0; j < ncpus; j++ {
+		// if we find a core with a start time before our's chose it
+		if startTime[j] < st[current] {
+			cChosen = j
+		}				
+		// but record the earliest available start time
+		if startTime[j] < eAvail {
+			eAvail = startTime[j]
+			eAvailC = j
+		}
+	}
+						
+	if cChosen == -1 {
+		cChosen = eAvailC
+		st[current] = eAvail
+	}
+			
+	//Schedule the event on this core
+	// prepare the event
+	ccEvent:=new(Event)
+	ccEvent.id=dag.At(current).(*parser.Node).Id
+	ccEvent.start=st[current]
+	ccEvent.end=st[current]+dag.At(current).(*parser.Node).Ex
+	// update the available startTime for the core we chose
+	startTime[cChosen] = ccEvent.end 
+
+	// schedule the task on a core
+	Schedule[cChosen].Push(ccEvent)
+	cpu[current]=cChosen
+			
+	//update children's pReq entries
+	// create a slice to contain the dag entries of the children
+	cIndexes:= make([]int, dag.At(current).(*parser.Node).Cl.Len())
+	for j:=0; j < dag.At(current).(*parser.Node).Cl.Len(); j++ {
+		cChildId:=dag.At(current).(*parser.Node).Cl.At(j).(*parser.Rel).Id
+		cIndexes[j]= parser.GetIndexById(dag, cChildId)
+		pReq[cIndexes[j]]--
+		if st[cIndexes[j]] <  ccEvent.end {
+			st[cIndexes[j]] =  ccEvent.end
+		}
+	}
+	//recurse
+	for jj:=0; jj < len(cIndexes); jj++ {
+		if (cpu[cIndexes[jj]] < 0) && (pReq[cIndexes[jj]] == 0 ) {
+			ScheduleCrec(dag, ncpus, cIndexes[jj], startTime, ccEvent.end, pReq, Schedule, cpu, st)
+		}
+	}
+			
+		
+		
+	
+	
+}
 
