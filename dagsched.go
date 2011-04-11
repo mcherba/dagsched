@@ -420,6 +420,9 @@ func SumExTime (S []vec.Vector) (int64){
 			for j:=0; j < S[i].Len(); j++ {
 				tsum += S[i].At(j).(*Event).end - S[i].At(j).(*Event).start
 			}
+			/*if S[i].Len() > 0 {
+			  tsum += S[i].Last().(*Event).end - S[i].At(0).(*Event).start
+			}*/
 		}
 	  
 		return tsum
