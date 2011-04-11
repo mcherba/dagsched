@@ -93,7 +93,7 @@ func TopSort(dag vec.Vector, s byte) (vec.Vector) {
 }
 
 // sorts the DAG and returns a vector of nodeIDs in order
-func TSort (dag vec.Vector) (vec.Vector) {
+func TSort (dag vec.Vector, dir byte) (vec.Vector) {
 	L :=new(vec.Vector)
 	Linv := new(vec.Vector)
 	visited := make([]bool, len(dag))
@@ -102,11 +102,19 @@ func TSort (dag vec.Vector) (vec.Vector) {
 		visited[i]=false
 	}
 	visit(dag, 0, L, visited)
+	
+	
 	for i:= 0; i < L.Len(); i++ {
 		Linv.Push(L.At( L.Len() - (i+1) ))
 	}
+	if dir!='r' {
+		return *L
+	}
 	return *Linv
+	
 }
+
+
 
 func visit (dag vec.Vector, n int, L *vec.Vector, visited []bool){
 	if !visited[n] {
